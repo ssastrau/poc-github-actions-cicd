@@ -1,5 +1,8 @@
+name: Dev pipeline
+
 on:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   static-code-analysis:
@@ -9,13 +12,41 @@ jobs:
       - name: Static Code Analysis
         run: echo "Running static code analysis..."
 
-  provisioning-linode:
-    name: Provisioning Linode
+  generate-matrix:
+    name: Generate apps matrix
     runs-on: ubuntu-latest
     needs: static-code-analysis
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Provisioning Linode
-        run: echo "Provisioning Linode instance..."
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find app folders under apps/
+        id: set-matrix
+        run: |
+          mapfile -t FOLDERS < <(find apps -maxdepth 1 -mindepth 1 -type d -printf '%f\n')
+          # create objects for matrix
+          J="["
+          SEP=""
+          for folder in "${FOLDERS[@]}"; do
+            J="${J}${SEP}{\"app\":\"$folder\"}"
+            SEP=","
+          done
+          J="${J}]"
+          MATRIX="{\"include\":$J}"
+          echo "Detected app folders: $J"
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  provisioning-linode:
+    name: Provisioning Linode [${{ matrix.app }}]
+    runs-on: ubuntu-latest
+    needs: generate-matrix
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    steps:
+      - name: Provision Linode for ${{ matrix.app }}
+        run: echo "Provisioning Linode for app: ${{ matrix.app }}"
 
   deploy-application:
     name: Deploy Application
@@ -23,7 +54,7 @@ jobs:
     needs: provisioning-linode
     steps:
       - name: Deploy Application
-        run: echo "Deploying application to Linode..."
+        run: echo "Deploying application..."
 
   run-tests:
     name: Run Tests
