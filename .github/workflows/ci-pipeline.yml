@@ -38,15 +38,13 @@ jobs:
           echo "Detected app folders: $J"
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
-  provisioning-linode:
-    name: Provisioning Linode [${{ matrix.app }}]
+  combined-job:
+    name: ${{ matrix.app }}
     runs-on: ubuntu-latest
     needs: generate-matrix
     strategy:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
       max-parallel: 2
-    outputs:
-      linode-info: ${{ steps.provision.outputs.linode-info }}
     steps:
       - name: Provision Linode for ${{ matrix.app }}
         id: provision
@@ -54,48 +52,27 @@ jobs:
           echo "Provisioning Linode for app: ${{ matrix.app }}"
           echo "linode-info=Linode details for ${{ matrix.app }}" >> $GITHUB_OUTPUT
 
-  deploy-application:
-    name: Deploy Application [${{ matrix.app }}]
-    runs-on: ubuntu-latest
-    needs: [ generate-matrix, provisioning-linode ]
-    strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-      max-parallel: 2
-    steps:
       - name: Deploy Application for ${{ matrix.app }}
+        id: deploy
         run: |
           echo "Deploying application for app: ${{ matrix.app }}"
-          echo "Using Linode info: ${{ needs.provisioning-linode.outputs.linode-info }}"
+          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
+          echo "app-info=https://example.com/${{ matrix.app }}" >> $GITHUB_OUTPUT
 
-  run-tests:
-    name: Run Tests [${{ matrix.app }}]
-    runs-on: ubuntu-latest
-    needs: [ generate-matrix, deploy-application ]
-    strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-      max-parallel: 2
-    steps:
       - name: Run Tests for ${{ matrix.app }}
         run: |
           echo "Running tests for app: ${{ matrix.app }}"
-          echo "Using app info: ${{ needs.deploy-application.outputs.app-info }}"
+          echo "Using app info: ${{ steps.deploy.outputs.app-info }}"
 
-  delete-linode:
-    name: Delete Linode [${{ matrix.app }}]
-    runs-on: ubuntu-latest
-    needs: [generate-matrix, run-tests]
-    strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-      max-parallel: 2
-    steps:
       - name: Delete Linode for ${{ matrix.app }}
         run: |
           echo "Deleting Linode for app: ${{ matrix.app }}"
+          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
 
   notify-results:
     name: Notify Results
     runs-on: ubuntu-latest
-    needs: delete-linode
+    needs: combined-job
     steps:
       - name: Notify Results
         run: echo "Notifying results of the CI pipeline..."
