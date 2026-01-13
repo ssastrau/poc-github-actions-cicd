@@ -32,15 +32,19 @@ jobs:
           # Filter for app directories under apps/
           APPS=$(echo "$CHANGED_FILES" | grep '^apps/' | cut -d'/' -f2 | sort -u)
           # Create objects for matrix
-          J="["
-          SEP=""
-          for app in $APPS; do
-            J="${J}${SEP}{\"app\":\"$app\"}"
-            SEP=","
-          done
-          J="${J}]"
-          MATRIX="{\"include\":$J}"
-          echo "Detected changed app folders: $J"
+          if [ -z "$APPS" ]; then
+            MATRIX="{\"include\":[]}"
+          else
+            J="["
+            SEP=""
+            for app in $APPS; do
+              J="${J}${SEP}{\"app\":\"$app\"}"
+              SEP=","
+            done
+            J="${J}]"
+            MATRIX="{\"include\":$J}"
+          fi
+          echo "Detected changed app folders: $MATRIX"
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
   combined-job:
