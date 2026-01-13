@@ -29,8 +29,10 @@ jobs:
         run: |
           # Get the list of changed files in the PR
           CHANGED_FILES=$(git diff --name-only origin/main)
+      
           # Filter for app directories under apps/
           APPS=$(echo "$CHANGED_FILES" | grep '^apps/' | cut -d'/' -f2 | sort -u)
+      
           # Create objects for matrix
           if [ -z "$APPS" ]; then
             MATRIX="{\"include\":[]}"
@@ -44,6 +46,7 @@ jobs:
             J="${J}]"
             MATRIX="{\"include\":$J}"
           fi
+      
           echo "Detected changed app folders: $MATRIX"
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
