@@ -46,7 +46,8 @@ jobs:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Provision Linode for ${{ matrix.app }}
-        run: echo "Provisioning Linode for app: ${{ matrix.app }}"
+        run: |
+          echo "Provisioning Linode for app: ${{ matrix.app }}"
 
   deploy-application:
     name: Deploy Application
