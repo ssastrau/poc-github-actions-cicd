@@ -1,0 +1,27 @@
+name: Simple CI
+
+on:
+  pull_request:
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Static Code Analysis
+        run: echo "Running static code analysis..."
+
+      - name: Provisioning Linode
+        run: echo "Provisioning Linode instance..."
+
+      - name: Deploy Application
+        run: echo "Deploying application to Linode..."
+
+      - name: Run Tests
+        run: echo "Running tests on deployed application..."
+
+      - name: Delete Linode
+        run: echo "Deleting Linode instance..."
+
+      - name: Notify Results
+        run: echo "Notifying results of the CI pipeline..."
