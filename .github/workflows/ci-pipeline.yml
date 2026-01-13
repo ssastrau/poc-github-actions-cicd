@@ -70,7 +70,7 @@ jobs:
   run-tests:
     name: Run Tests [${{ matrix.app }}]
     runs-on: ubuntu-latest
-    needs: deploy-application
+    needs: [ generate-matrix, deploy-application ]
     strategy:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
       max-parallel: 2
