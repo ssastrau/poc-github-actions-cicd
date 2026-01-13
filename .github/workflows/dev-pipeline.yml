@@ -1,4 +1,4 @@
-name: Scheduled pipeline
+name: Dev pipeline
 
 on:
   pull_request:
