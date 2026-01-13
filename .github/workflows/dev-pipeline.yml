@@ -20,9 +20,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetch all history for proper comparison
-          ref: main # Ensure the main branch is fetched
 
       - name: Find changed app folders in PR
         id: set-matrix
