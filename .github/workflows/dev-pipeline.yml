@@ -1,0 +1,82 @@
+name: Scheduled pipeline
+
+on:
+  pull_request:
+
+jobs:
+  static-code-analysis:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Static Code Analysis
+        run: echo "Running static code analysis..."
+
+  get-list-of-apps:
+    name: Get list of apps
+    runs-on: ubuntu-latest
+    needs: static-code-analysis
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Find changed app folders in PR
+        id: set-matrix
+        run: |
+          # Get the list of changed files in the PR
+          CHANGED_FILES=$(git diff --name-only origin/main)
+          # Filter for app directories under apps/
+          APPS=$(echo "$CHANGED_FILES" | grep '^apps/' | cut -d'/' -f2 | sort -u)
+          # Create objects for matrix
+          J="["
+          SEP=""
+          for app in $APPS; do
+            J="${J}${SEP}{\"app\":\"$app\"}"
+            SEP=","
+          done
+          J="${J}]"
+          MATRIX="{\"include\":$J}"
+          echo "Detected changed app folders: $J"
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  combined-job:
+    name: ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    needs: get-list-of-apps
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+      max-parallel: 2
+    steps:
+      - name: Provision Linode for ${{ matrix.app }}
+        id: provision
+        run: |
+          echo "Provisioning Linode for app: ${{ matrix.app }}"
+          echo "linode-info=Linode details for ${{ matrix.app }}" >> $GITHUB_OUTPUT
+
+      - name: Deploy Application for ${{ matrix.app }}
+        id: deploy
+        run: |
+          echo "Deploying application for app: ${{ matrix.app }}"
+          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
+          echo "app-info=https://example.com/${{ matrix.app }}" >> $GITHUB_OUTPUT
+
+      - name: Run Tests for ${{ matrix.app }}
+        run: |
+          echo "Running tests for app: ${{ matrix.app }}"
+          echo "Using app info: ${{ steps.deploy.outputs.app-info }}"
+
+      - name: Delete Linode for ${{ matrix.app }}
+        run: |
+          echo "Deleting Linode for app: ${{ matrix.app }}"
+          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
+
+  notify-results:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: combined-job
+    steps:
+      - name: Notify Results
+        run: echo "Notifying results of the CI pipeline..."
