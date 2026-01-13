@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: get-list-of-apps
     strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.get-list-of-apps.outputs.matrix) }}
       max-parallel: 2
     steps:
       - name: Provision Linode for ${{ matrix.app }}
