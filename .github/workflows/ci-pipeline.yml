@@ -50,28 +50,37 @@ jobs:
           echo "Provisioning Linode for app: ${{ matrix.app }}"
 
   deploy-application:
-    name: Deploy Application
+    name: Deploy Application [${{ matrix.app }}]
     runs-on: ubuntu-latest
     needs: provisioning-linode
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
-      - name: Deploy Application
-        run: echo "Deploying application..."
+      - name: Deploy Application for ${{ matrix.app }}
+        run: |
+          echo "Deploying application for app: ${{ matrix.app }}"
 
   run-tests:
-    name: Run Tests
+    name: Run Tests [${{ matrix.app }}]
     runs-on: ubuntu-latest
     needs: deploy-application
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
-      - name: Run Tests
-        run: echo "Running tests on deployed application..."
+      - name: Run Tests for ${{ matrix.app }}
+        run: |
+          echo "Running tests for app: ${{ matrix.app }}"
 
   delete-linode:
-    name: Delete Linode
+    name: Delete Linode [${{ matrix.app }}]
     runs-on: ubuntu-latest
     needs: run-tests
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
-      - name: Delete Linode
-        run: echo "Deleting Linode instance..."
+      - name: Delete Linode for ${{ matrix.app }}
+        run: |
+          echo "Deleting Linode for app: ${{ matrix.app }}"
 
   notify-results:
     name: Notify Results
