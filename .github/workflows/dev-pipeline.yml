@@ -61,16 +61,15 @@ jobs:
       matrix: ${{ fromJson(needs.get-changes-from-pr.outputs.matrix) }}
       max-parallel: 2
     steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
       - name: running tests for ${{ matrix.app }} app
         run: |
           set -e
           pip install selenium webdriver-manager
-          echo "Current directory:"
-          pwd
-          echo "Listing root files:"
-          ls -l
-          echo "Listing app directory files:"
-          ls -l apps/${{ matrix.app }}
           python3 apps/${{ matrix.app }}/app_tests.py ${{ steps.provision.outputs.linode-info }}
 
   notify-results:
