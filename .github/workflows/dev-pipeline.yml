@@ -54,7 +54,7 @@ jobs:
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
   combined-job:
-    name: testing ${{ matrix.app }}
+    name: app deployment and testing
     runs-on: ubuntu-latest
     needs: get-changes-from-pr
     if: needs.get-changes-from-pr.outputs.matrix != '{"include":[]}'
@@ -175,7 +175,9 @@ jobs:
     name: providing results
     runs-on: ubuntu-latest
     needs: combined-job
-    if: always()
+    if: |
+      always() &&
+      (needs.static-code-analysis.result != 'skipped' || needs.combined-job.result != 'skipped')
     steps:
       - name: post workflow results
         uses: actions/github-script@v7
