@@ -134,8 +134,9 @@ jobs:
           "
           
           # Run the installation script
-            chmod +x test.sh &&
-            ./test.sh
+          cd /root/repo/apps/${{ matrix.app }} &&
+          chmod +x test.sh &&
+          ./test.sh
 
       - name: Run Tests for ${{ matrix.app }}
         run: |
