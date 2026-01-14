@@ -71,7 +71,7 @@ jobs:
                 "region": "se-sto",
                 "type": "g6-nanode-1",
                 "label": "ubuntu-se-sto",
-                "root_pass": "${{ secrets.LINODE_PASSWORD }}",
+                "root_pass": "${{ secrets.LINODE_POOT_PASS }}",
                 "disk_encryption": "enabled"
             }' https://api.linode.com/v4/linode/instances)
           
