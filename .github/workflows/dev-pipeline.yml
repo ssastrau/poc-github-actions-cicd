@@ -88,7 +88,6 @@ jobs:
         id: deploy
         run: |
           set -e
-          IPV4=$(echo "${{ steps.provision.outputs.linode-info }}")
           LINODE_ID=$(jq -r '.id' response.json)
 
           # Wait for Linode to be fully provisioned with a timeout of 5 minutes
@@ -109,7 +108,7 @@ jobs:
             ELAPSED=$((ELAPSED + 10))
           done
 
-          sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$IPV4 "cd /path/to/${{ matrix.app }} && ./test.sh"
+          sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$IPV4 "cd /root/linode-app-new && ./test.sh"
 
       - name: Run Tests for ${{ matrix.app }}
         run: |
