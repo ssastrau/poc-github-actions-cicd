@@ -61,109 +61,12 @@ jobs:
       matrix: ${{ fromJson(needs.get-list-of-apps.outputs.matrix) }}
       max-parallel: 2
     steps:
-#      - name: provisioning linode for ${{ matrix.app }}
-#        id: provision
-#        run: |
-#          set -e
-#          RESPONSE=$(curl -s -o response.json -w "%{http_code}" \
-#            -H "Content-Type: application/json" \
-#            -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
-#            -X POST -d '{
-#                "image": "linode/ubuntu22.04",
-#                "maintenance_policy": "linode/migrate",
-#                "private_ip": false,
-#                "region": "se-sto",
-#                "type": "g6-nanode-1",
-#                "label": "ubuntu-se-sto",
-#                "root_pass": "${{ secrets.LINODE_ROOT_PASS }}",
-#                "disk_encryption": "enabled"
-#            }' https://api.linode.com/v4/linode/instances)
-#
-#          if [ "$RESPONSE" -ne 200 ]; then
-#            echo "API call failed with status code $RESPONSE"
-#            cat response.json
-#            exit 1
-#          fi
-#
-#          IPV4=$(jq -r '.ipv4[0]' response.json)
-#          echo "linode-info=$IPV4" >> $GITHUB_OUTPUT
-
-#      - name: deploying ${{ matrix.app }} app
-#        id: deploy
-#        run: |
-#          set -e
-#          LINODE_ID=$(jq -r '.id' response.json)
-#          LINODE_IPV4=$(jq -r '.ipv4[0]' response.json)
-#
-#          # Wait for Linode to be fully provisioned
-#          TIMEOUT=300
-#          ELAPSED=0
-#          while true; do
-#            STATUS=$(curl -s -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
-#              https://api.linode.com/v4/linode/instances/$LINODE_ID | jq -r '.status')
-#            if [ "$STATUS" == "running" ]; then
-#              break
-#            fi
-#            if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
-#              echo "Timeout reached. Linode provisioning failed."
-#              exit 1
-#            fi
-#            echo "Waiting for Linode to be provisioned..."
-#            sleep 10
-#            ELAPSED=$((ELAPSED + 10))
-#          done
-#
-#          # Retry SSH connection
-#          SSH_TIMEOUT=300
-#          SSH_ELAPSED=0
-#          while true; do
-#            if sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$LINODE_IPV4 "exit"; then
-#              break
-#            fi
-#            if [ "$SSH_ELAPSED" -ge "$SSH_TIMEOUT" ]; then
-#              echo "Timeout reached. Unable to connect to Linode via SSH."
-#              exit 1
-#            fi
-#            echo "Waiting for SSH to be ready..."
-#            sleep 10
-#            SSH_ELAPSED=$((SSH_ELAPSED + 10))
-#          done
-#
-#          # Clone the repository, run test-vars.sh, and then run the installation script
-#          sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$LINODE_IPV4 "
-#          set -e
-#          git clone --depth 1 --branch ${{ github.head_ref }} ${{ github.event.pull_request.head.repo.clone_url }} /root/repo &&
-#          cd /root/repo/apps/${{ matrix.app }} &&
-#          chmod +x test-vars.sh deployment_script.sh &&
-#          . ./test-vars.sh &&
-#          ./deployment_script.sh
-#          "
-
       - name: running tests for ${{ matrix.app }} app
         run: |
           set -e
           pip install selenium webdriver-manager
           ls
           python3 apps/${{ matrix.app }}/app_tests.py ${{ steps.provision.outputs.linode-info }}
-
-#      - name: deleting linode for ${{ matrix.app }} app
-#        if: always()
-#        run: |
-#          set -e
-#          LINODE_ID=$(jq -r '.id' response.json)
-#          if [ -n "$LINODE_ID" ] && [ "$LINODE_ID" != "null" ]; then
-#            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
-#              -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
-#              https://api.linode.com/v4/linode/instances/$LINODE_ID)
-#            if [ "$RESPONSE" = "200" ]; then
-#              echo "Linode $LINODE_ID deleted successfully."
-#            else
-#              echo "Failed to delete Linode $LINODE_ID. Status code: $RESPONSE"
-#              exit 1
-#            fi
-#          else
-#            echo "No Linode ID found to delete."
-#          fi
 
   notify-results:
     name: providing results
