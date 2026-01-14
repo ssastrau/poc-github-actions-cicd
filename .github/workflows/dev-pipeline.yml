@@ -129,20 +129,27 @@ jobs:
           set -e
           git clone --depth 1 --branch ${{ github.head_ref }} ${{ github.event.pull_request.head.repo.clone_url }} /root/repo &&
           cd /root/repo/apps/${{ matrix.app }} &&
-          chmod +x test-vars.sh test.sh &&
+          chmod +x test-vars.sh deployment_script.sh &&
           . ./test-vars.sh &&
-          ./test.sh
+          ./deployment_script.sh
           "
 
-      - name: Run Tests for ${{ matrix.app }}
+      - name: Run Jenkins UI Test for ${{ matrix.app }}
         run: |
-          echo "Running tests for app: ${{ matrix.app }}"
-          echo "Using app info: ${{ steps.deploy.outputs.app-info }}"
+          pip install selenium webdriver-manager
+          python3 app_tests.py ${{ steps.provision.outputs.linode-info }}
 
       - name: Delete Linode for ${{ matrix.app }}
         run: |
-          echo "Deleting Linode for app: ${{ matrix.app }}"
-          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
+          LINODE_ID=$(jq -r '.id' response.json)
+          if [ -n "$LINODE_ID" ] && [ "$LINODE_ID" != "null" ]; then
+            curl -s -X DELETE \
+              -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
+              https://api.linode.com/v4/linode/instances/$LINODE_ID
+            echo "Linode $LINODE_ID deleted."
+          else
+            echo "No Linode ID found to delete."
+          fi
 
   notify-results:
     name: 4. Notify Results
