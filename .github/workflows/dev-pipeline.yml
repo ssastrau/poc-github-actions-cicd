@@ -3,16 +3,20 @@ name: Dev pipeline
 on:
   pull_request:
 
+permissions:
+  pull-requests: write
+  issues: write
+
 jobs:
   static-code-analysis:
-    name: Static Code Analysis
+    name: running static code analysis
     runs-on: ubuntu-latest
     steps:
       - name: Static Code Analysis
         run: echo "Running static code analysis..."
 
-  get-list-of-apps:
-    name: Get list of apps
+  get-changes-from-pr:
+    name: getting changes from pr
     runs-on: ubuntu-latest
     needs: static-code-analysis
     outputs:
@@ -21,8 +25,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all history for proper comparison
-          ref: main # Ensure the main branch is fetched
+          fetch-depth: 0
 
       - name: Find changed app folders in PR
         id: set-matrix
@@ -51,40 +54,151 @@ jobs:
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
   combined-job:
-    name: ${{ matrix.app }}
+    name: app deployment and testing
     runs-on: ubuntu-latest
-    needs: get-list-of-apps
+    needs: get-changes-from-pr
+    if: needs.get-changes-from-pr.outputs.matrix != '{"include":[]}'
     strategy:
-      matrix: ${{ fromJson(needs.get-list-of-apps.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.get-changes-from-pr.outputs.matrix) }}
       max-parallel: 2
     steps:
-      - name: Provision Linode for ${{ matrix.app }}
+      - name: checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: provisioning linode for ${{ matrix.app }}
         id: provision
         run: |
-          echo "Provisioning Linode for app: ${{ matrix.app }}"
-          echo "linode-info=Linode details for ${{ matrix.app }}" >> $GITHUB_OUTPUT
+          set -e
+          RESPONSE=$(curl -s -o response.json -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
+            -X POST -d '{
+                "image": "linode/ubuntu22.04",
+                "maintenance_policy": "linode/migrate",
+                "private_ip": false,
+                "region": "se-sto",
+                "type": "g6-nanode-1",
+                "label": "ubuntu-se-sto",
+                "root_pass": "${{ secrets.LINODE_ROOT_PASS }}",
+                "disk_encryption": "enabled"
+            }' https://api.linode.com/v4/linode/instances)
+          
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "API call failed with status code $RESPONSE"
+            cat response.json
+            exit 1
+          fi
+          
+          IPV4=$(jq -r '.ipv4[0]' response.json)
+          echo "linode-info=$IPV4" >> $GITHUB_OUTPUT
 
-      - name: Deploy Application for ${{ matrix.app }}
+      - name: deploying ${{ matrix.app }} app
         id: deploy
         run: |
-          echo "Deploying application for app: ${{ matrix.app }}"
-          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
-          echo "app-info=https://example.com/${{ matrix.app }}" >> $GITHUB_OUTPUT
+          set -e
+          LINODE_ID=$(jq -r '.id' response.json)
+          LINODE_IPV4=$(jq -r '.ipv4[0]' response.json)
+          
+          # Wait for Linode to be fully provisioned
+          TIMEOUT=300
+          ELAPSED=0
+          while true; do
+            STATUS=$(curl -s -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
+              https://api.linode.com/v4/linode/instances/$LINODE_ID | jq -r '.status')
+            if [ "$STATUS" == "running" ]; then
+              break
+            fi
+            if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+              echo "Timeout reached. Linode provisioning failed."
+              exit 1
+            fi
+            echo "Waiting for Linode to be provisioned..."
+            sleep 10
+            ELAPSED=$((ELAPSED + 10))
+          done
+          
+          # Retry SSH connection
+          SSH_TIMEOUT=300
+          SSH_ELAPSED=0
+          while true; do
+            if sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$LINODE_IPV4 "exit"; then
+              break
+            fi
+            if [ "$SSH_ELAPSED" -ge "$SSH_TIMEOUT" ]; then
+              echo "Timeout reached. Unable to connect to Linode via SSH."
+              exit 1
+            fi
+            echo "Waiting for SSH to be ready..."
+            sleep 10
+            SSH_ELAPSED=$((SSH_ELAPSED + 10))
+          done
+          
+          # Clone the repository, run test-vars.sh, and then run the installation script
+          sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$LINODE_IPV4 "
+          set -e
+          git clone --depth 1 --branch ${{ github.head_ref }} ${{ github.event.pull_request.head.repo.clone_url }} /root/repo &&
+          cd /root/repo/apps/${{ matrix.app }} &&
+          chmod +x test-vars.sh deployment_script.sh &&
+          . ./test-vars.sh &&
+          ./deployment_script.sh
+          "
 
-      - name: Run Tests for ${{ matrix.app }}
+      - name: running tests for ${{ matrix.app }} app
         run: |
-          echo "Running tests for app: ${{ matrix.app }}"
-          echo "Using app info: ${{ steps.deploy.outputs.app-info }}"
+          set -e
+          pip install selenium webdriver-manager
+          python3 apps/${{ matrix.app }}/app_tests.py ${{ steps.provision.outputs.linode-info }}
 
-      - name: Delete Linode for ${{ matrix.app }}
+      - name: deleting linode for ${{ matrix.app }} app
+        if: always()
         run: |
-          echo "Deleting Linode for app: ${{ matrix.app }}"
-          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
+          set -e
+          LINODE_ID=$(jq -r '.id' response.json)
+          if [ -n "$LINODE_ID" ] && [ "$LINODE_ID" != "null" ]; then
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+              -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
+              https://api.linode.com/v4/linode/instances/$LINODE_ID)
+            if [ "$RESPONSE" = "200" ]; then
+              echo "Linode $LINODE_ID deleted successfully."
+            else
+              echo "Failed to delete Linode $LINODE_ID. Status code: $RESPONSE"
+              exit 1
+            fi
+          else
+            echo "No Linode ID found to delete."
+          fi
 
   notify-results:
-    name: Notify Results
+    name: providing results
     runs-on: ubuntu-latest
     needs: combined-job
+    if: always()
     steps:
-      - name: Notify Results
-        run: echo "Notifying results of the CI pipeline..."
+      - name: post workflow results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const combinedStatus = '${{ needs.combined-job.result }}';
+            const runUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            let statusMsg;
+
+            if (combinedStatus === 'success') {
+              statusMsg = '✅ All app deployments and tests passed.';
+            } else if (combinedStatus === 'skipped') {
+              statusMsg = 'ℹ️ No app changes detected. Deployment and testing were skipped.';
+            } else if (combinedStatus === 'failure') {
+              statusMsg = '❌ App deployments or tests failed.';
+            } else {
+              statusMsg = `Workflow status: **${combinedStatus}**.`;
+            }
+
+            github.rest.issues.createComment({
+              owner: pr.base.repo.owner.login,
+              repo: pr.base.repo.name,
+              issue_number: pr.number,
+              body: `Hello @${pr.user.login},\n\n${statusMsg}\n\n[View workflow run details](${runUrl})`
+            });
