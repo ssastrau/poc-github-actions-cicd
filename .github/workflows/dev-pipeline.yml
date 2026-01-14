@@ -82,15 +82,13 @@ jobs:
           fi
           
           IPV4=$(jq -r '.ipv4[0]' response.json)
-          echo "Linode IPv4: $IPV4"
           echo "linode-info=$IPV4" >> $GITHUB_OUTPUT
 
       - name: Deploy Application for ${{ matrix.app }}
         id: deploy
         run: |
-          echo "Deploying application for app: ${{ matrix.app }}"
-          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
-          echo "app-info=https://example.com/${{ matrix.app }}" >> $GITHUB_OUTPUT
+          IPV4=$(echo "${{ steps.provision.outputs.linode-info }}")
+          sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$IPV4 "cd /path/to/${{ matrix.app }} && ./test.sh"
 
       - name: Run Tests for ${{ matrix.app }}
         run: |
