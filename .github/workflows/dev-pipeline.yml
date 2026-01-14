@@ -90,7 +90,7 @@ jobs:
           set -e
           LINODE_ID=$(jq -r '.id' response.json)
           LINODE_IPV4=$(jq -r '.ipv4[0]' response.json)
-
+          
           # Wait for Linode to be fully provisioned
           TIMEOUT=300
           ELAPSED=0
@@ -108,7 +108,7 @@ jobs:
             sleep 10
             ELAPSED=$((ELAPSED + 10))
           done
-
+          
           # Retry SSH connection
           SSH_TIMEOUT=300
           SSH_ELAPSED=0
@@ -124,14 +124,18 @@ jobs:
             sleep 10
             SSH_ELAPSED=$((SSH_ELAPSED + 10))
           done
-
-          # Clone the PR and run test.sh
+          
+          # Clone the repository and run test-vars.sh
           sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$LINODE_IPV4 "
             git clone --depth 1 --branch ${{ github.head_ref }} ${{ github.event.pull_request.head.repo.clone_url }} /root/repo &&
             cd /root/repo/apps/${{ matrix.app }} &&
+            chmod +x test-vars.sh &&
+            ./test-vars.sh
+          "
+          
+          # Run the installation script
             chmod +x test.sh &&
             ./test.sh
-          "
 
       - name: Run Tests for ${{ matrix.app }}
         run: |
