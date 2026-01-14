@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: get-changes-from-pr
     strategy:
-      matrix: ${{ fromJson(needs.get-list-of-apps.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.get-changes-from-pr.outputs.matrix) }}
       max-parallel: 2
     steps:
       - name: running tests for ${{ matrix.app }} app
