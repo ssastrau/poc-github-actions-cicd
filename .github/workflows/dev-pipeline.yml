@@ -60,18 +60,30 @@ jobs:
       - name: Provision Linode for ${{ matrix.app }}
         id: provision
         run: |
-          curl -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
-          -X POST -d '{
-              "image": "linode/ubuntu22.04",
-              "maintenance_policy": "linode/migrate",
-              "private_ip": false,
-              "region": "se-sto",
-              "type": "g6-nanode-1",
-              "label": "ubuntu-se-sto",
-              "root_pass": "${{ secrets.LINODE_PASSWORD }}",
-              "disk_encryption": "enabled"
-          }' https://api.linode.com/v4/linode/instances
+          set -e
+          RESPONSE=$(curl -s -o response.json -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
+            -X POST -d '{
+                "image": "linode/ubuntu22.04",
+                "maintenance_policy": "linode/migrate",
+                "private_ip": false,
+                "region": "se-sto",
+                "type": "g6-nanode-1",
+                "label": "ubuntu-se-sto",
+                "root_pass": "${{ secrets.LINODE_PASSWORD }}",
+                "disk_encryption": "enabled"
+            }' https://api.linode.com/v4/linode/instances)
+          
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "API call failed with status code $RESPONSE"
+            cat response.json
+            exit 1
+          fi
+          
+          IPV4=$(jq -r '.ipv4[0]' response.json)
+          echo "Linode IPv4: $IPV4"
+          echo "linode-info=$IPV4" >> $GITHUB_OUTPUT
 
       - name: Deploy Application for ${{ matrix.app }}
         id: deploy
