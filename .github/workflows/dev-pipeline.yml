@@ -8,8 +8,18 @@ jobs:
     name: 1. Static Code Analysis
     runs-on: ubuntu-latest
     steps:
-      - name: Static Code Analysis
-        run: echo "Running static code analysis..."
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck on shell scripts
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          find . -type f -name "*.sh" -exec shellcheck {} +
+
+      - name: Run flake8 on Python files
+        run: |
+          pip install flake8
+          flake8 .
 
   get-list-of-apps:
     name: 2. Get list of apps
@@ -60,6 +70,7 @@ jobs:
       - name: Provision Linode for ${{ matrix.app }}
         id: provision
         run: |
+          set -e
           RESPONSE=$(curl -s -o response.json -w "%{http_code}" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
@@ -136,11 +147,14 @@ jobs:
 
       - name: Run Jenkins UI Test for ${{ matrix.app }}
         run: |
+          set -e
           pip install selenium webdriver-manager
-          python3 app_tests.py ${{ steps.provision.outputs.linode-info }}
+          python3 apps/${{ matrix.app }}/app_tests.py ${{ steps.provision.outputs.linode-info }}
 
       - name: Delete Linode for ${{ matrix.app }}
+        if: always()
         run: |
+          set -e
           LINODE_ID=$(jq -r '.id' response.json)
           if [ -n "$LINODE_ID" ] && [ "$LINODE_ID" != "null" ]; then
             curl -s -X DELETE \
@@ -155,6 +169,18 @@ jobs:
     name: 4. Notify Results
     runs-on: ubuntu-latest
     needs: combined-job
+    if: always()
     steps:
-      - name: Notify Results
-        run: echo "Notifying results of the CI pipeline..."
+      - name: Post workflow result as PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const status = '${{ needs.combined-job.result }}';
+            const runUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            github.rest.issues.createComment({
+              owner: pr.base.repo.owner.login,
+              repo: pr.base.repo.name,
+              issue_number: pr.number,
+              body: `Hello @${pr.user.login},\n\nThe CI workflow for your PR #${pr.number} has completed.\nStatus: **${status}**\n\n[View workflow run details](${runUrl})`
+            });
