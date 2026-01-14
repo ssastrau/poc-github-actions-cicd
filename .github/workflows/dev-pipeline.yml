@@ -109,6 +109,22 @@ jobs:
             ELAPSED=$((ELAPSED + 10))
           done
 
+          # Retry SSH connection until successful or timeout
+          SSH_TIMEOUT=300
+          SSH_ELAPSED=0
+          while true; do
+            if sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$LINODE_IPV4 "exit"; then
+              break
+            fi
+            if [ "$SSH_ELAPSED" -ge "$SSH_TIMEOUT" ]; then
+              echo "Timeout reached. Unable to connect to Linode via SSH."
+              exit 1
+            fi
+            echo "Waiting for SSH to be ready..."
+            sleep 10
+            SSH_ELAPSED=$((SSH_ELAPSED + 10))
+          done
+
           sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$LINODE_IPV4 "cd /root/linode-app-new && ./test.sh"
       
 
