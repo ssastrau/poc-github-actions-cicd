@@ -3,6 +3,10 @@ name: Dev pipeline
 on:
   pull_request:
 
+permissions:
+  pull-requests: write
+  issues: write
+
 jobs:
   static-code-analysis:
     name: 1. Static Code Analysis
