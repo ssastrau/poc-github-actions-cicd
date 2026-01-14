@@ -134,9 +134,11 @@ jobs:
           "
           
           # Run the installation script
-          cd /root/repo/apps/${{ matrix.app }} &&
-          chmod +x test.sh &&
-          ./test.sh
+          sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$LINODE_IPV4 "
+            cd /root/repo/apps/${{ matrix.app }} &&
+            chmod +x test.sh &&
+            ./test.sh
+          "
 
       - name: Run Tests for ${{ matrix.app }}
         run: |
