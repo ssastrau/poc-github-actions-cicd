@@ -126,12 +126,12 @@ jobs:
           
           # Clone the repository, run test-vars.sh, and then run the installation script
           sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$LINODE_IPV4 "
-            git clone --depth 1 --branch ${{ github.head_ref }} ${{ github.event.pull_request.head.repo.clone_url }} /root/repo &&
-            cd /root/repo/apps/${{ matrix.app }} &&
-            chmod +x test-vars.sh &&
-            ./test-vars.sh &&
-            chmod +x test.sh &&
-            ./test.sh
+          set -e
+          git clone --depth 1 --branch ${{ github.head_ref }} ${{ github.event.pull_request.head.repo.clone_url }} /root/repo &&
+          cd /root/repo/apps/${{ matrix.app }} &&
+          chmod +x test-vars.sh test.sh &&
+          . ./test-vars.sh &&
+          ./test.sh
           "
 
       - name: Run Tests for ${{ matrix.app }}
