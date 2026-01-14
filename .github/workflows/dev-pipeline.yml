@@ -183,22 +183,15 @@ jobs:
           script: |
             const pr = context.payload.pull_request;
             const combinedStatus = '${{ needs.combined-job.result }}';
-            const staticStatus = '${{ needs.static-code-analysis.result }}';
             const runUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
             let statusMsg;
 
             if (combinedStatus === 'success') {
               statusMsg = '✅ All app deployments and tests passed.';
             } else if (combinedStatus === 'skipped') {
-              if (staticStatus === 'success') {
-                statusMsg = 'ℹ️ No app changes detected. Static code analysis passed.';
-              } else if (staticStatus === 'failure') {
-                statusMsg = '⚠️ No app changes detected. Static code analysis failed.';
-              } else {
-                statusMsg = `ℹ️ No app changes detected. Static code analysis status: **${staticStatus}**.`;
-              }
+              statusMsg = 'ℹ️ No app changes detected. Deployment and testing were skipped.';
             } else if (combinedStatus === 'failure') {
-              statusMsg = '❌ App tests or deployments failed.';
+              statusMsg = '❌ App deployments or tests failed.';
             } else {
               statusMsg = `Workflow status: **${combinedStatus}**.`;
             }
