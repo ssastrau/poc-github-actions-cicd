@@ -7,7 +7,7 @@ on:
 
 jobs:
   static-code-analysis:
-    name: Static Code Analysis
+    name: static code analysis
     runs-on: ubuntu-latest
     steps:
       - name: Static Code Analysis
