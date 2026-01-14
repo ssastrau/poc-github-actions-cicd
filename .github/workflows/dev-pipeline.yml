@@ -187,5 +187,5 @@ jobs:
               owner: pr.base.repo.owner.login,
               repo: pr.base.repo.name,
               issue_number: pr.number,
-              body: `Hello @${pr.user.login},\n\nThe CI workflow for your PR #${pr.number} has completed.\nStatus: **${status}**\n\n[View workflow run details](${runUrl})`
+              body: `Hello @${pr.user.login},\n\nThe workflow for your PR has completed. Status: **${status}**\n\n[View workflow run details](${runUrl})`
             });
