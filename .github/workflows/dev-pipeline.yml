@@ -87,7 +87,28 @@ jobs:
       - name: Deploy Application for ${{ matrix.app }}
         id: deploy
         run: |
+          set -e
           IPV4=$(echo "${{ steps.provision.outputs.linode-info }}")
+          LINODE_ID=$(jq -r '.id' response.json)
+
+          # Wait for Linode to be fully provisioned with a timeout of 5 minutes
+          TIMEOUT=300
+          ELAPSED=0
+          while true; do
+            STATUS=$(curl -s -H "Authorization: Bearer ${{ secrets.LINODE_API_SECRET }}" \
+              https://api.linode.com/v4/linode/instances/$LINODE_ID | jq -r '.status')
+            if [ "$STATUS" == "running" ]; then
+              break
+            fi
+            if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+              echo "Timeout reached. Linode provisioning failed."
+              exit 1
+            fi
+            echo "Waiting for Linode to be provisioned..."
+            sleep 10
+            ELAPSED=$((ELAPSED + 10))
+          done
+
           sshpass -p "${{ secrets.LINODE_ROOT_PASS }}" ssh -o StrictHostKeyChecking=no root@$IPV4 "cd /path/to/${{ matrix.app }} && ./test.sh"
 
       - name: Run Tests for ${{ matrix.app }}
