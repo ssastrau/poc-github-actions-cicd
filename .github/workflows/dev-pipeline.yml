@@ -9,14 +9,14 @@ permissions:
 
 jobs:
   static-code-analysis:
-    name: 1. Static Code Analysis
+    name: running static code analysis
     runs-on: ubuntu-latest
     steps:
       - name: Static Code Analysis
         run: echo "Running static code analysis..."
 
-  get-list-of-apps:
-    name: 2. Get list of apps
+  get-changes-from-pr:
+    name: getting changes from pr
     runs-on: ubuntu-latest
     needs: static-code-analysis
     outputs:
@@ -54,14 +54,14 @@ jobs:
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
   combined-job:
-    name: 3. ${{ matrix.app }}
+    name: testing ${{ matrix.app }}
     runs-on: ubuntu-latest
-    needs: get-list-of-apps
+    needs: get-changes-from-pr
     strategy:
       matrix: ${{ fromJson(needs.get-list-of-apps.outputs.matrix) }}
       max-parallel: 2
     steps:
-      - name: Provision Linode for ${{ matrix.app }}
+      - name: provisioning linode for ${{ matrix.app }}
         id: provision
         run: |
           set -e
@@ -88,7 +88,7 @@ jobs:
           IPV4=$(jq -r '.ipv4[0]' response.json)
           echo "linode-info=$IPV4" >> $GITHUB_OUTPUT
 
-      - name: Deploy Application for ${{ matrix.app }}
+      - name: deploying ${{ matrix.app }} app
         id: deploy
         run: |
           set -e
@@ -139,13 +139,13 @@ jobs:
           ./deployment_script.sh
           "
 
-      - name: Run Jenkins UI Test for ${{ matrix.app }}
+      - name: running tests for ${{ matrix.app }} app
         run: |
           set -e
           pip install selenium webdriver-manager
           python3 apps/${{ matrix.app }}/app_tests.py ${{ steps.provision.outputs.linode-info }}
 
-      - name: Delete Linode for ${{ matrix.app }}
+      - name: deleting linode for ${{ matrix.app }} app
         if: always()
         run: |
           set -e
@@ -160,12 +160,12 @@ jobs:
           fi
 
   notify-results:
-    name: 4. Notify Results
+    name: providing results
     runs-on: ubuntu-latest
     needs: combined-job
     if: always()
     steps:
-      - name: Post workflow result as PR comment
+      - name: post workflow results
         uses: actions/github-script@v7
         with:
           script: |
