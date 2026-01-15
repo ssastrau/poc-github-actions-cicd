@@ -50,7 +50,13 @@ fi
 if [[ -n "${SOA_EMAIL_ADDRESS}" ]]; then
         UDF_VARS["SOA_EMAIL_ADDRESS"]="${SOA_EMAIL_ADDRESS}"
 else
-        UDF_VARS["SOA_EMAIL_ADDRESS"]="admin@email.com" # default
+        UDF_VARS["SOA_EMAIL_ADDRESS"]="webmaster@${DEFAULT_DNS}" # default
+fi
+
+if [[ -n "${JENKINS_VERSION}" ]]; then
+        UDF_VARS["JENKINS_VERSION"]="${JENKINS_VERSION}"
+else
+        UDF_VARS["JENKINS_VERSION"]="2.479" # default
 fi
 
 if [[ -n "${ADD_ONS}" ]]; then
@@ -59,24 +65,6 @@ else
         UDF_VARS["ADD_ONS"]="none" # default
 fi
 
-# Jenkins-specific UDFs
-if [[ -n "${JENKINS_VERSION}" ]]; then
-        UDF_VARS["JENKINS_VERSION"]="${JENKINS_VERSION}"
-else
-        UDF_VARS["JENKINS_VERSION"]="2.479" # default
-fi
-
-if [[ -n "${JENKINS_ADMIN_USER}" ]]; then
-        UDF_VARS["JENKINS_ADMIN_USER"]="${JENKINS_ADMIN_USER}"
-else
-        UDF_VARS["JENKINS_ADMIN_USER"]="" # default
-fi
-
-if [[ -n "${JENKINS_ADMIN_PASSWORD}" ]]; then
-        UDF_VARS["JENKINS_ADMIN_PASSWORD"]="${JENKINS_ADMIN_PASSWORD}"
-else
-        UDF_VARS["JENKINS_ADMIN_PASSWORD"]="" # default
-fi
 
 set_vars() {
   for key in "${!UDF_VARS[@]}"; do
