@@ -14,7 +14,7 @@ jobs:
         run: echo "Running static code analysis..."
 
   get-list-of-apps:
-    name: Get list of apps
+    name: getting list of all apps
     runs-on: ubuntu-latest
     needs: static-code-analysis
     outputs:
@@ -71,7 +71,7 @@ jobs:
           echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
 
   notify-results:
-    name: Notify Results
+    name: notify Results
     runs-on: ubuntu-latest
     needs: combined-job
     steps:
