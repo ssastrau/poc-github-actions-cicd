@@ -1,0 +1,79 @@
+name: Scheduled pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * 0"
+
+jobs:
+  static-code-analysis:
+    name: static code analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Static Code Analysis
+        run: echo "Running static code analysis..."
+
+  get-list-of-apps:
+    name: getting list of all apps
+    runs-on: ubuntu-latest
+    needs: static-code-analysis
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find app folders under apps/
+        id: set-matrix
+        run: |
+          mapfile -t FOLDERS < <(find apps -maxdepth 1 -mindepth 1 -type d -printf '%f\n')
+          # create objects for matrix
+          J="["
+          SEP=""
+          for folder in "${FOLDERS[@]}"; do
+            J="${J}${SEP}{\"app\":\"$folder\"}"
+            SEP=","
+          done
+          J="${J}]"
+          MATRIX="{\"include\":$J}"
+          echo "Detected app folders: $J"
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  combined-job:
+    name: ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    needs: get-list-of-apps
+    strategy:
+      matrix: ${{ fromJson(needs.get-list-of-apps.outputs.matrix) }}
+      max-parallel: 2
+    steps:
+      - name: Provision Linode for ${{ matrix.app }}
+        id: provision
+        run: |
+          echo "Provisioning Linode for app: ${{ matrix.app }}"
+          echo "linode-info=Linode details for ${{ matrix.app }}" >> $GITHUB_OUTPUT
+
+      - name: Deploy Application for ${{ matrix.app }}
+        id: deploy
+        run: |
+          echo "Deploying application for app: ${{ matrix.app }}"
+          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
+          echo "app-info=https://example.com/${{ matrix.app }}" >> $GITHUB_OUTPUT
+
+      - name: Run Tests for ${{ matrix.app }}
+        run: |
+          echo "Running tests for app: ${{ matrix.app }}"
+          echo "Using app info: ${{ steps.deploy.outputs.app-info }}"
+
+      - name: Delete Linode for ${{ matrix.app }}
+        run: |
+          echo "Deleting Linode for app: ${{ matrix.app }}"
+          echo "Using Linode info: ${{ steps.provision.outputs.linode-info }}"
+
+  notify-results:
+    name: providing results
+    runs-on: ubuntu-latest
+    needs: combined-job
+    steps:
+      - name: Sending Report
+        run: echo "Notifying results of the CI pipeline..."
