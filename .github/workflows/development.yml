@@ -12,9 +12,9 @@ jobs:
     outputs:
       environment: ${{ steps.check-permissions.outputs.environment }}
     env:
-      AUTHOR_NAME: ${{ github.event.pull_request.user.login }}
+      AUTHOR_NAME: ${{ github.event.pull_request.user.login || github.actor }}
       AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association || 'COLLABORATOR' }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_NUMBER: ${{ github.event.pull_request.number || 'branch' }}
       BRANCH: ${{ github.head_ref || github.ref_name }}
       TARGET: ${{ github.event.pull_request.base.ref || 'main'}}
     steps:
