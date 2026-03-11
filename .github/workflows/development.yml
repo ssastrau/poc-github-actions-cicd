@@ -4,11 +4,48 @@ on:
   workflow_dispatch:
   pull_request_target:
 jobs:
+  check-author-permissions-job:
+    name: Check author permissions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      environment: ${{ steps.set-environment.outputs.environment }}
+    steps:
+      - name: Check author permissions
+        id: check-permissions
+        env:
+          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association || 'COLLABORATOR' }}
+        run: |
+          if [[ "$AUTHOR_ASSOCIATION" =~ ^(COLLABORATOR|MEMBER|OWNER)$ ]]; then
+            echo "environment=development_internal" >> $GITHUB_OUTPUT
+          else
+            echo "environment=development_external" >> $GITHUB_OUTPUT
+          fi
+  approve_workflow_job:
+    name: Approve workflow
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment: ${{ needs.check-author-permissions-job.outputs.environment }}
+    needs: check-author-permissions-job
+    steps:
+      - name: Print deployment summary
+        run: |
+          echo "## Deployment Approval Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **PR** | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Author** | ${{ github.event.pull_request.user.login }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`${{ github.head_ref }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target** | \`${{ github.event.pull_request.base.ref }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | \`${{ needs.get-environment.outputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
   static-code-analysis-shellcheck:
     name: Static code analysis - shellcheck
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    needs: approve_workflow_job
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -21,6 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    needs: approve_workflow_job
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -33,6 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    needs: approve_workflow_job
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -63,51 +102,12 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           TARGET: ${{ github.event.pull_request.base.ref || 'main'}}
         run: bash .github/scripts/get-updated-apps.sh
-  get-environment:
-    name: Get environment
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    needs: get-updated-apps
-    if: needs.get-updated-apps.outputs.configs != '[]'
-    outputs:
-      environment: ${{ steps.set-environment.outputs.environment }}
-    steps:
-      - name: Set environment
-        id: set-environment
-        env:
-          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association || 'COLLABORATOR' }}
-        run: |
-          if [[ "$AUTHOR_ASSOCIATION" =~ ^(COLLABORATOR|MEMBER|OWNER)$ ]]; then
-            echo "environment=development_internal" >> $GITHUB_OUTPUT
-          else
-            echo "environment=development_external" >> $GITHUB_OUTPUT
-          fi
-  approval_job:
-    name: Approving for deployment and testing
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    environment: ${{ needs.get-environment.outputs.environment }}
-    needs: [get-updated-apps, get-environment]
-    if: needs.get-updated-apps.outputs.configs != '[]'
-    steps:
-      - name: Print deployment summary
-        run: |
-          echo "## Deployment Approval Summary" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| **PR** | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Author** | ${{ github.event.pull_request.user.login }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Branch** | \`${{ github.head_ref }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Target** | \`${{ github.event.pull_request.base.ref }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Apps to deploy** | ${{ needs.get-updated-apps.outputs.configs }} |" >> $GITHUB_STEP_SUMMARY
   setup-job:
     name: Setup data for deployment and testing
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    needs: [get-updated-apps, approval_job]
+    needs: get-updated-apps
     if: needs.get-updated-apps.outputs.configs != '[]'
     env:
       LINODE_API_SECRET: ${{ secrets.LINODE_API_SECRET }}
@@ -126,7 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    needs: [get-updated-apps, approval_job, setup-job]
+    needs: [get-updated-apps, setup-job]
     strategy:
       fail-fast: false
       matrix:
