@@ -11,15 +11,15 @@ jobs:
       contents: read
     outputs:
       environment: ${{ steps.check-permissions.outputs.environment }}
+    env:
+      AUTHOR_NAME: ${{ github.event.pull_request.user.login }}
+      AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association || 'COLLABORATOR' }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BRANCH: ${{ github.head_ref || github.ref_name }}
+      TARGET: ${{ github.event.pull_request.base.ref || 'main'}}
     steps:
       - name: Check author permissions
         id: check-permissions
-        env:
-          AUTHOR_NAME: ${{ github.event.pull_request.user.login }}
-          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association || 'COLLABORATOR' }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BRANCH: ${{ github.head_ref || github.ref_name }}
-          TARGET: ${{ github.event.pull_request.base.ref || 'main'}}
         run: |
           if [[ "$AUTHOR_ASSOCIATION" =~ ^(COLLABORATOR|MEMBER|OWNER)$ ]]; then
             echo "environment=development_internal" >> $GITHUB_OUTPUT
