@@ -10,7 +10,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      environment: ${{ steps.set-environment.outputs.environment }}
+      environment: ${{ steps.check-permissions.outputs.environment }}
     steps:
       - name: Check author permissions
         id: check-permissions
