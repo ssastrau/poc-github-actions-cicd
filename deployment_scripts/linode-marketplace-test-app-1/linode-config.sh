@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REGION="us-ord"
+REGION="us-mia"
 LINODE_TYPE="g6-dedicated-4"
 IMAGE="linode/ubuntu22.04"
 
